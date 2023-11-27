@@ -138,12 +138,15 @@ def print_metrics(test_labels, predicted_labels):
     print("Recall: %.2f %%" % (100.0*recall_score(test_labels, predicted_labels, average='weighted')))
     print("F1: %.2f %%" % (100.0*f1_score(test_labels, predicted_labels, average='weighted')))
 
-
 def confusion_matrix(test_labels, predicted_labels, labels):
     cm = confusion_matrix(test_labels, predicted_labels)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names_dict_train.keys())
     disp.plot(xticks_rotation='vertical')
     plt.show()
+
+#loss function graphisch
+#file-upload
+#pre-trained model
 
 def main():
     train_path = "archive/train"
