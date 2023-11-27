@@ -8,8 +8,9 @@ import os.path
 import cv2
 import random
 import matplotlib.image as mpimg
+import tensorflow as tf
 
-
+from tensorflow.keras.optimizers.legacy import Adam
 from PIL import Image
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -96,7 +97,7 @@ def random_forest(train_images, train_labels, test_images, test_labels):
 
     return predicted_labels
 
-def cnn(train_path):
+def cnn(train_dir, test_dir):
     print("cnn: creating generator...")
     imagegen = ImageDataGenerator()
     print("cnn: loading training data...")
@@ -132,15 +133,82 @@ def cnn(train_path):
 
     model.summary()
 
+    BATCH_SIZE = 512
+    train_data = tf.keras.utils.image_dataset_from_directory(train_dir, shuffle=True, image_size=(256,256), labels='inferred', label_mode='categorical', batch_size=BATCH_SIZE)
+    test_data = tf.keras.utils.image_dataset_from_directory(test_dir, shuffle=False, image_size=(256,256), labels='inferred', label_mode='categorical', batch_size=BATCH_SIZE)
+
+    model.compile(optimizer='adam',
+              loss = 'categorical_crossentropy',
+              metrics=['accuracy', "Recall", "Precision"])
+    
+    history = model.fit(train_data, validation_data=(test_data), epochs=30)
+
+    loss, accuracy, recall, precision = model.evaluate(test_data)
+    print("Loss: %.2f %%" % (100*loss))
+    print("Accuracy: %.2f %%" % (100*accuracy))
+    print("Recall: %.2f %%" % (100*recall))
+    print("Precision: %.2f %%"% (100*precision))
+
+    return history
+
 def print_metrics(test_labels, predicted_labels):
     print("Accuracy: %.2f %% " % (100.0*accuracy_score(test_labels, predicted_labels)))
     print("Precision: %.2f %%" % (100.0*precision_score(test_labels, predicted_labels, average='weighted')))
     print("Recall: %.2f %%" % (100.0*recall_score(test_labels, predicted_labels, average='weighted')))
     print("F1: %.2f %%" % (100.0*f1_score(test_labels, predicted_labels, average='weighted')))
 
+def plot_loss_curves(history):
+    """
+    Returns separate loss curves for training and validation metrics.
+    """
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+
+    accuracy = history.history['accuracy']
+    val_accuracy = history.history['val_accuracy']
+
+    recall = history.history['recall']
+    val_recall = history.history['val_recall']
+
+    precision = history.history['precision']
+    val_precision = history.history['val_precision']
+
+    epochs = range(len(history.history['loss']))
+
+    # Plot loss
+    plt.plot(epochs, loss, label='training_loss')
+    plt.plot(epochs, val_loss, label='val_loss')
+    plt.title('Loss')
+    plt.xlabel('Epochs')
+    plt.legend()
+
+    # Plot accuracy
+    plt.figure()
+    plt.plot(epochs, accuracy, label='training_accuracy')
+    plt.plot(epochs, val_accuracy, label='val_accuracy')
+    plt.title('Accuracy')
+    plt.xlabel('Epochs')
+    plt.legend();
+
+    # Plot recall
+    plt.figure()
+    plt.plot(epochs, recall, label='training_recall')
+    plt.plot(epochs, val_recall, label='val_recall')
+    plt.title('Recall')
+    plt.xlabel('Epochs')
+    plt.legend()
+
+    # Plot precision
+    plt.figure()
+    plt.plot(epochs, precision, label='training_precision')
+    plt.plot(epochs, val_precision, label='val_precision')
+    plt.title('Precision')
+    plt.xlabel('Epochs')
+    plt.legend()
+
 def confusion_matrix(test_labels, predicted_labels, labels):
     cm = confusion_matrix(test_labels, predicted_labels)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=class_names_dict_train.keys())
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels.keys())
     disp.plot(xticks_rotation='vertical')
     plt.show()
 
@@ -166,7 +234,12 @@ def main():
     
     predictions = random_forest(train_images, train_labels, test_images, test_labels)
 
-    print_metrics(test_labels, predictions, labels)
+    print_metrics(test_labels, predictions)
+    confusion_matrix(test_labels, predicted_labels, labels)
+
+    history = cnn(train_path, test_path)
+
+    plot_loss_curves(history)
     return 0
 
 if __name__ == '__main__':
