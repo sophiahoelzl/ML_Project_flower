@@ -17,6 +17,8 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPool2D, Flatten, Dense, InputLayer, BatchNormalization, Dropout
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.applications.resnet50 import preprocess_input
 
 
 
@@ -137,6 +139,7 @@ def print_metrics(test_labels, predicted_labels):
     print("Precision: %.2f %%" % (100.0*precision_score(test_labels, predicted_labels, average='weighted')))
     print("Recall: %.2f %%" % (100.0*recall_score(test_labels, predicted_labels, average='weighted')))
     print("F1: %.2f %%" % (100.0*f1_score(test_labels, predicted_labels, average='weighted')))
+    
 
 def confusion_matrix(test_labels, predicted_labels, labels):
     cm = confusion_matrix(test_labels, predicted_labels)
@@ -166,8 +169,45 @@ def main():
     
     predictions = random_forest(train_images, train_labels, test_images, test_labels)
 
-    print_metrics(test_labels, predictions, labels)
+    print_metrics(test_labels, predictions)
+
+    pre_trained_model()
     return 0
+
+
+### Pre-trained model ###
+
+def pre_trained_model():
+    # Get the model
+    model = get_model()
+    # Compile it
+    model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
+    # Summary of model
+    model.summary()
+
+number_class = 5
+
+def get_model():
+
+    base_model = ResNet50(weights='imagenet', include_top=False)
+
+    for layer in base_model.layers:
+        layer.trainable = False
+
+    base_model_ouput = base_model.output
+
+    x = GlobalAveragePooling2D()(base_model_ouput)
+
+    x = Dense(512, activation='relu')(x)
+    x = Dense(num_classes, activation='softmax', name='fcnew')(x)
+
+    model = Model(inputs=base_model.input, outputs=x)
+
+    return model
+
+
+
+
 
 if __name__ == '__main__':
     main()
