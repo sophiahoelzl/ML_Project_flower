@@ -19,6 +19,5 @@ Packages needed:
 ----
 
 Installation:
-clone github repository
-
-----
+-clone github repository
+-type following command in bash: python main.py
