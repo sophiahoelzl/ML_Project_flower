@@ -68,9 +68,12 @@ def load_images_from_files(dir_path, label_dict):
 
             file_path = os.path.join(root, f)
             img = mpimg.imread(file_path)
-            normalized = np.asarray(img / 255)
+            #print("img ", img)
+            #normalized = np.asarray(img / 255)
+            #print("normalized ", normalized)
+            #return 0
 
-            images.append(normalized)
+            images.append(img)
             labels.append(label_dict[os.path.basename(os.path.dirname(os.path.join(root, f)))])
     print("load_images_from_files dirpath=" + dir_path + ": images loaded...")
     return images, labels
@@ -225,10 +228,10 @@ def lstm_pipe(in_layer):
 
 def rnn(train_data, train_labels, test_data, test_labels):
     print("rnn: adding cnn layers...")
+    num_classes = 5
 
-    batch_size = 32
-    num_classes = 1
-    epochs = 2
+    batch_size = 128
+    epochs = 1
 
     row, col, channels = 256, 256, 3
 
@@ -243,18 +246,21 @@ def rnn(train_data, train_labels, test_data, test_labels):
     prediction = Dense(num_classes, activation='softmax')(encoded_columns)
     
     model = Model(input, prediction)
+
+    train_labels_cat = to_categorical(train_labels, num_classes)
+    test_labels_cat = to_categorical(test_labels, num_classes)
     
     model.compile(loss='categorical_crossentropy',
                 optimizer='adam',
                 metrics=['accuracy'])
-    
-    model.summary()
 
-    history = model.fit(train_data, train_labels,
+    history = model.fit(train_data, train_labels_cat,
               batch_size=batch_size,
               epochs=epochs,
               verbose=1,
-              validation_data=(test_data, test_labels))
+              validation_data=(test_data, test_labels_cat))
+
+    model.summary()
     
     loss, accuracy, recall, precision = model.evaluate(test_data)
     print("Loss: %.2f %%" % (100*loss))
@@ -279,6 +285,7 @@ def main():
 
     # img = display_random_img("archive/train/", random.choice(list(train_classes)))
 
+    #print(train_images, " ", train_labels)
     np.shape(train_images), np.shape(train_labels)
 
     # random forest
