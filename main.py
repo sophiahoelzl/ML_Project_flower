@@ -7,6 +7,7 @@ import os
 import os.path
 import cv2
 import random
+import pandas as pd
 import matplotlib.image as mpimg
 import tensorflow as tf
 from keras import Model
@@ -20,10 +21,16 @@ from PIL import Image
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.model_selection import train_test_split
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPool2D, Flatten, Dense, InputLayer, BatchNormalization, Dropout, \
     GlobalAveragePooling2D
+from keras.datasets import mnist
+from keras.models import Model
+from keras.layers import Input, Dense, TimeDistributed
+from keras.layers import LSTM, Bidirectional, Conv1D, concatenate, Permute, Reshape
+from keras.utils import to_categorical
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input
 
@@ -111,8 +118,10 @@ def random_forest(train_images, train_labels, test_images, test_labels):
 def cnn(train_dir, test_dir):
     print("cnn: creating generator...")
     imagegen = ImageDataGenerator()
-    train_data = imagegen.flow_from_directory(train_dir, class_mode="categorical", batch_size=128, target_size=(256, 256))
-    test_data = imagegen.flow_from_directory(test_dir, class_mode="categorical", batch_size=128, target_size=(256, 256), shuffle=False)
+    train_data = imagegen.flow_from_directory(train_dir, class_mode="categorical",
+                                              batch_size=128, target_size=(256, 256))
+    test_data = imagegen.flow_from_directory(test_dir, class_mode="categorical",
+                                             batch_size=128, target_size=(256, 256), shuffle=False)
 
     model = Sequential()
     model.add(InputLayer(input_shape=(256, 256, 3)))
@@ -137,14 +146,14 @@ def cnn(train_dir, test_dir):
 
     model.compile(
         optimizer='adam',
-        loss = tf.keras.losses.CategoricalCrossentropy(),
+        loss = 'categorical_crossentropy',
         metrics=["accuracy", "Recall", "Precision"],
     )
 
-    history = model.fit(train_data, epochs=10, validation_data=test_data)
+    history = model.fit(train_data, epochs=1, validation_data=test_data)
     print(history.history.keys())
 
-    #model.summary()
+    model.summary()
 
     loss, accuracy, recall, precision = model.evaluate(test_data)
     print("Loss: %.2f %%" % (100*loss))
@@ -202,6 +211,64 @@ def confusion_matrix_graph(test_labels, predicted_labels, labels):
     disp.plot(xticks_rotation='vertical')
     plt.show()
 
+def lstm_pipe(in_layer):
+    row_hidden = 128
+    col_hidden = 128
+    
+    x = Conv1D(row_hidden, kernel_size=3, padding = 'same')(in_layer)
+    x = Conv1D(row_hidden, kernel_size=3, padding = 'same')(x)
+    
+    x = Reshape((-1, row_hidden))(x)
+
+    encoded_rows = Bidirectional(LSTM(row_hidden, return_sequences = True))(x)
+    return LSTM(col_hidden)(encoded_rows)
+
+def rnn(train_data, train_labels, test_data, test_labels):
+    '''X_train = X_train.reshape(X_train.shape[0], img_rows, img_cols)
+    X_test = X_test.reshape(X_test.shape[0], img_rows, img_cols)
+    X_val = X_val.reshape(X_val.shape[0], img_rows, img_cols)
+
+    X_train = X_train.astype('float32')
+    X_test = X_test.astype('float32')
+    X_val = X_val.astype('float32')
+    X_train /= 255
+    X_test /= 255
+    X_val /= 255'''
+
+    batch_size = 32
+    num_classes = 1
+    epochs = 2
+
+    row, col, channels = 256, 256, 3
+
+    input = Input(shape=(row, col, channels))
+
+    first_read = lstm_pipe(input)
+    trans_read = lstm_pipe(Permute(dims = (2, 1, 3))(input))
+    
+    encoded_columns = concatenate([first_read, trans_read])
+    encoded_columns = Dropout(0.2)(encoded_columns)
+    
+    prediction = Dense(num_classes, activation='softmax')(encoded_columns)
+    
+    model = Model(input, prediction)
+    
+    model.compile(loss='categorical_crossentropy',
+                optimizer='adam',
+                metrics=['accuracy'])
+    
+    model.summary()
+
+    history = model.fit(train_data, train_labels,
+              batch_size=batch_size,
+              epochs=epochs,
+              verbose=1,
+              validation_data=(test_data, test_labels))
+    
+    scores = model.evaluate(test_data, test_labels, verbose=0)
+    print('Test loss:', scores[0])
+    print('Test accuracy:', scores[1])
+
 def main():
     train_path = "archive/train"
     test_path = "archive/test"
@@ -220,17 +287,24 @@ def main():
     np.shape(train_images), np.shape(train_labels)
 
     # random forest
-    '''predictions = random_forest(train_images, train_labels, test_images, test_labels)
-    print_metrics(test_labels, predictions)
-    confusion_matrix_graph(test_labels, predictions, labels)'''
+    #predictions = random_forest(train_images, train_labels, test_images, test_labels)
+    #print_metrics(test_labels, predictions)
+    #confusion_matrix_graph(test_labels, predictions, labels)
 
     # cnn
-    history = cnn(train_path, test_path)
-    plot_loss_curves(history)
+    #history = cnn(train_path, test_path)
+    #plot_loss_curves(history)
 
-    pretrained_model = pre_trained_model()
-    pre_trained_history = train_pretrained_model(pretrained_model, train_path, test_path)
-    plot_loss_curves(pre_trained_history)
+    #pretrained_model = pre_trained_model()
+    #pre_trained_history = train_pretrained_model(pretrained_model, train_path, test_path)
+    #plot_loss_curves(pre_trained_history)
+
+    # rnn
+    rnn(np.array(train_images),
+        np.array(train_labels),
+        np.array(test_images),
+        np.array(test_labels))
+
     return 0
 
 
