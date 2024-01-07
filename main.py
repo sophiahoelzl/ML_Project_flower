@@ -224,16 +224,7 @@ def lstm_pipe(in_layer):
     return LSTM(col_hidden)(encoded_rows)
 
 def rnn(train_data, train_labels, test_data, test_labels):
-    '''X_train = X_train.reshape(X_train.shape[0], img_rows, img_cols)
-    X_test = X_test.reshape(X_test.shape[0], img_rows, img_cols)
-    X_val = X_val.reshape(X_val.shape[0], img_rows, img_cols)
-
-    X_train = X_train.astype('float32')
-    X_test = X_test.astype('float32')
-    X_val = X_val.astype('float32')
-    X_train /= 255
-    X_test /= 255
-    X_val /= 255'''
+    print("rnn: adding cnn layers...")
 
     batch_size = 32
     num_classes = 1
@@ -265,9 +256,13 @@ def rnn(train_data, train_labels, test_data, test_labels):
               verbose=1,
               validation_data=(test_data, test_labels))
     
-    scores = model.evaluate(test_data, test_labels, verbose=0)
-    print('Test loss:', scores[0])
-    print('Test accuracy:', scores[1])
+    loss, accuracy, recall, precision = model.evaluate(test_data)
+    print("Loss: %.2f %%" % (100*loss))
+    print("Accuracy: %.2f %%" % (100*accuracy))
+    print("Recall: %.2f %%" % (100*recall))
+    print("Precision: %.2f %%"% (100*precision))
+    
+    return history
 
 def main():
     train_path = "archive/train"
