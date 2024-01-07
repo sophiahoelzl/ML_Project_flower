@@ -34,6 +34,10 @@ from keras.utils import to_categorical
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input
 
+from tensorflow.keras.applications.inception_v3 import InceptionV3
+from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras import layers
+
 
 def load_labels(dir_path):
     label_dict = dict(zip(os.listdir(dir_path), range(len(dir_path))))
@@ -302,10 +306,12 @@ def main():
     #plot_loss_curves(pre_trained_history)
 
     # rnn
-    rnn(np.array(train_images),
-        np.array(train_labels),
-        np.array(test_images),
-        np.array(test_labels))
+    #rnn(np.array(train_images),
+     #   np.array(train_labels),
+      #  np.array(test_images),
+       # np.array(test_labels))
+
+    inception(train_path, test_path)
 
     return 0
 
@@ -313,6 +319,34 @@ def main():
 ## Pre-trained model ##
 
 num_classes = 5
+
+def inception(train_path, test_path):
+    train_data_gen = ImageDataGenerator(rescale = 1./255., rotation_range = 40, width_shift_range = 0.2, height_shift_range = 0.2,shear_range = 0.2, zoom_range = 0.2, horizontal_flip = True)
+
+    test_data = ImageDataGenerator( rescale = 1.0/255. )
+
+    train_generator = train_data_gen.flow_from_directory(train_path, batch_size = 20, class_mode = 'binary', target_size = (150, 150))
+    validation_generator = test_data.flow_from_directory(test_path, batch_size = 20, class_mode = 'binary', target_size = (150, 150))
+
+    base_model = InceptionV3(input_shape = (150, 150, 3), include_top = False, weights = 'imagenet')
+
+    for layer in base_model.layers:
+        layer.trainable = False
+
+
+
+    x = layers.Flatten()(base_model.output)
+    x = layers.Dense(1024, activation='relu')(x)
+    x = layers.Dropout(0.2)(x)
+
+    # Add a final sigmoid layer with 1 node for classification output
+    x = layers.Dense(1, activation='sigmoid')(x)
+
+    model = tf.keras.models.Model(base_model.input, x)
+
+    model.compile(optimizer = RMSprop(lr=0.0001), loss = 'binary_crossentropy', metrics = ['acc'])
+
+    inc_history = model.fit_generator(train_generator, validation_data = validation_generator, steps_per_epoch = 100, epochs = 10)
 
 
 def pre_trained_model():
